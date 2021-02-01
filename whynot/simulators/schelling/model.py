@@ -9,7 +9,7 @@ from mesa.datacollection import DataCollector
 class SchellingAgent(Agent):
     """Schelling segregation agent model."""
 
-    def __init__(self, pos, model, agent_type, homophily):
+    def __init__(self, pos, model, agent_type, homophily, treated):
         """Create a new Schelling agent.
 
         Parameters
@@ -17,12 +17,14 @@ class SchellingAgent(Agent):
             unique_id: Unique identifier for the agent.
             x, y: Agent initial location.
             agent_type: Indicator for the agent's type (minority=1, majority=0)
+            treated: Boolean indicator for whether the agent is treated (1) or not (0)
 
         """
         super().__init__(pos, model)
         self.pos = pos
         self.type = agent_type
         self.homophily = homophily
+        self.treated = treated
 
     def step(self):
         """Update the agent model after one step."""
@@ -87,11 +89,13 @@ class Schelling(Model):
                     agent_type = 0
 
                 agent_homophily = homophily
+                agent_treated = 0
                 if self.random.random() < self.education_pc:
                     agent_homophily += self.education_boost
+                    agent_treated = 1
 
                 agent = SchellingAgent(
-                    (x_coord, y_coord), self, agent_type, agent_homophily
+                    (x_coord, y_coord), self, agent_type, agent_homophily, agent_treated
                 )
                 self.grid.position_agent(agent, (x_coord, y_coord))
                 self.schedule.add(agent)

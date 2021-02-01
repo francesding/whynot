@@ -45,8 +45,57 @@ def get_segregation(model):
 
     return segregated_agents / model.schedule.get_agent_count()
 
+def get_treated_segregation(model):
+    """Find the fraction of treated agents that only have neighbors of their same type."""
+    segregated_agents = 0
+    treated_agents = 0
+    for agent in model.schedule.agents:
+        if agent.treated:
+            treated_agents += 1
+            segregated = True
+            for neighbor in model.grid.neighbor_iter(agent.pos):
+                if neighbor.type != agent.type:
+                    segregated = False
+                    break
+            if segregated:
+                segregated_agents += 1
+    if model.schedule.get_agent_count() == 0 or treated_agents == 0:
+        return 0.0
 
-def simulate(config, rollouts=10, seed=None):
+    return segregated_agents / treated_agents
+
+def get_treated_agents(model):
+    treated_agents = 0
+    for agent in model.schedule.agents:
+        if agent.treated:
+            treated_agents += 1
+
+    return treated_agents
+
+def get_untreated_agents(model):
+    return model.schedule.get_agent_count() - get_treated_agents(model)
+
+def get_untreated_segregation(model):
+    """Find the fraction of untreated agents that only have neighbors of their same type."""
+    segregated_agents = 0
+    untreated_agents = 0
+    for agent in model.schedule.agents:
+        if not agent.treated:
+            untreated_agents += 1
+            segregated = True
+            for neighbor in model.grid.neighbor_iter(agent.pos):
+                if neighbor.type != agent.type:
+                    segregated = False
+                    break
+            if segregated:
+                segregated_agents += 1
+    if model.schedule.get_agent_count() == 0 or untreated_agents == 0:
+        return 0.0
+
+    return segregated_agents / untreated_agents
+
+
+def simulate(config, rollouts=10, seed=None, simple_RCT=True):
     """Simulate repeated runs of the Schelling model for config.
 
     Parameters
@@ -65,7 +114,11 @@ def simulate(config, rollouts=10, seed=None):
             for each rollout.
 
     """
-    model_reporters = {"Segregated_Agents": get_segregation}
+    model_reporters = {"Segregated_Agents": get_segregation,
+                       "Segregated_Treated_Agents": get_treated_segregation,
+                       "Segregated_Untreated_Agents": get_untreated_segregation,
+                       "Treated_Agents": get_treated_agents,
+                       "Untreated_Agents": get_untreated_agents}
 
     rng = np.random.RandomState(seed)
 
@@ -82,8 +135,19 @@ def simulate(config, rollouts=10, seed=None):
     )
     param_sweep.run_all()
     dataframe = param_sweep.get_model_vars_dataframe()
+
+    fraction_treated = dataframe.Treated_Agents.sum() / (dataframe.Treated_Agents.sum() + dataframe.Untreated_Agents.sum())# np.mean( dataframe.Treated_Agents / (dataframe.Treated_Agents + dataframe.Untreated_Agents) )
     # Currently just reports the fraction segregated.
-    return dataframe.Segregated_Agents.mean()
+
+    if simple_RCT :
+        return dataframe.Segregated_Agents.mean()
+    else:
+        return fraction_treated, \
+               dataframe.Segregated_Treated_Agents.mean(), \
+               dataframe.Segregated_Untreated_Agents.mean(), \
+               dataframe.Segregated_Agents.mean(),\
+               dataframe.Treated_Agents.mean(), \
+               dataframe.education_pc.mean()
 
 
 if __name__ == "__main__":
